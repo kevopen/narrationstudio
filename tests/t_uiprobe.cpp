@@ -2,10 +2,12 @@
 // import-heavy path that once segfaulted (QPixmap in a worker thread).
 // Uses real webtoon images + real OCR on a 3-page work range.
 #include <QtTest>
+#include <QFile>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QDialogButtonBox>
+#include <QStandardPaths>
 #include <QTimer>
 #include "core/pipeline.h"
 #include "ui/dialogs.h"
@@ -45,6 +47,15 @@ private slots:
   void webtoonDialogFlow() {
     // Full user path: menu slot -> dialog (auto-filled+accepted) ->
     // real CLI download in pool thread -> populate. Crashes here = found it.
+    // Needs webtoon-downloader on the machine; SKIP without it (CI).
+    QString dl = QStandardPaths::findExecutable("webtoon-downloader");
+    if (dl.isEmpty()) {
+      const QString home = QDir::homePath();
+      for (const QString &c : {home + "/.local/bin/webtoon-downloader.exe",
+                               home + "/.local/bin/webtoon-downloader"})
+        if (QFile::exists(c)) { dl = c; break; }
+    }
+    if (dl.isEmpty()) QSKIP("webtoon-downloader not installed");
     MainWindow w;
     w.show();
     QTimer::singleShot(1500, [&]{

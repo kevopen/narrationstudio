@@ -68,9 +68,10 @@ qt_add_executable(t_ocr t_ocr.cpp
   $<$<NOT:$<BOOL:${NS_HAS_KOKORO}>>:${CMAKE_SOURCE_DIR}/src/services/rapid_ocr_fallback.cpp>
 )
 target_include_directories(t_ocr PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(t_ocr PRIVATE Qt6::Test Qt6::Gui)
 if(NS_HAS_KOKORO)
   target_include_directories(t_ocr PRIVATE "${ORT_ROOT}/include")
-  target_link_libraries(t_ocr PRIVATE Qt6::Test Qt6::Gui "${ORT_ROOT}/lib/onnxruntime.lib")
+  target_link_libraries(t_ocr PRIVATE "${ORT_ROOT}/lib/onnxruntime.lib")
   add_custom_command(TARGET t_ocr POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${ORT_ROOT}/lib/onnxruntime.dll" "$<TARGET_FILE_DIR:t_ocr>"
