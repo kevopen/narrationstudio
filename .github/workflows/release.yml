@@ -12,9 +12,21 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
       - name: Install Qt 6.8.2
         # qtsvg ships as an archive (not a module) in 6.8 — manual aqt call.
+        # Mirror flakes happen (corrupt 7z); retry from scratch up to 3x.
         run: |
           pip install -q aqtinstall
-          aqt install-qt windows desktop 6.8.2 win64_msvc2022_64 -O C:\Qt --archives qtbase qtsvg --modules qtmultimedia qtimageformats qtpdf
+          $ok = $false
+          for ($i = 1; $i -le 3 -and !$ok; $i++) {
+            try {
+              if (Test-Path C:\Qt) { Remove-Item -Recurse -Force C:\Qt }
+              aqt install-qt windows desktop 6.8.2 win64_msvc2022_64 -O C:\Qt --archives qtbase qtsvg --modules qtmultimedia qtimageformats qtpdf
+              if ($LASTEXITCODE -eq 0) { $ok = $true } else { throw "exit $LASTEXITCODE" }
+            } catch {
+              Write-Host "Qt install attempt $i failed, retrying..."
+              Start-Sleep -Seconds 20
+            }
+          }
+          if (!$ok) { throw "Qt install failed after 3 attempts" }
           echo "CMAKE_PREFIX_PATH=C:/Qt/6.8.2/msvc2022_64" >> $GITHUB_ENV
       - name: Install CMake + Ninja + NSIS
         run: choco install cmake ninja nsis -y
