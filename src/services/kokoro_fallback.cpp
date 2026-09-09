@@ -27,3 +27,13 @@ bool KokoroTtsEngine::synthesize(const QString &, const QString &,
              "scripts/fetch-kokoro.ps1, reconfigure, rebuild.";
   return false;
 }
+
+bool KokoroTtsEngine::synthesizePages(const QStringList &texts, const QString &wavDir,
+                                      QStringList *wavOuts,
+                                      QVector<QVector<Boundary>> *boundsPerPage,
+                                      std::function<void(int,int)> progress,
+                                      QString *error) {
+  // Base-class loop over synthesize(); fails fast with the message above.
+  return ITtsEngine::synthesizePages(texts, wavDir, wavOuts, boundsPerPage,
+                                     progress, error);
+}

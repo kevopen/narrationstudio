@@ -35,6 +35,7 @@ add_test(NAME narration COMMAND t_narration)
 # (Needs models/third_party present; tests SKIP gracefully without them.)
 qt_add_executable(t_kokoro t_kokoro.cpp
   ${CMAKE_SOURCE_DIR}/src/services/engines.h
+  ${CMAKE_SOURCE_DIR}/src/services/kokoro_engine.h
   ${CMAKE_SOURCE_DIR}/src/services/stubs.cpp
   ${CMAKE_SOURCE_DIR}/src/services/kokoro_npz.cpp
   ${CMAKE_SOURCE_DIR}/src/services/kokoro_g2p.cpp
@@ -62,6 +63,7 @@ add_test(NAME kokoro COMMAND t_kokoro WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 # OCR units (ctc + reading order) + live engine smoke (SKIPs without models).
 qt_add_executable(t_ocr t_ocr.cpp
   ${CMAKE_SOURCE_DIR}/src/services/engines.h
+  ${CMAKE_SOURCE_DIR}/src/services/rapid_ocr.h
   ${CMAKE_SOURCE_DIR}/src/services/stubs.cpp
   ${CMAKE_SOURCE_DIR}/src/services/rapid_ocr_units.cpp
   $<$<BOOL:${NS_HAS_KOKORO}>:${CMAKE_SOURCE_DIR}/src/services/rapid_ocr.cpp>
@@ -84,6 +86,7 @@ add_test(NAME ocr COMMAND t_ocr WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 # Florence BPE round-trip + live caption smoke (SKIPs without models).
 qt_add_executable(t_florence t_florence.cpp
   ${CMAKE_SOURCE_DIR}/src/services/engines.h
+  ${CMAKE_SOURCE_DIR}/src/services/florence_engine.h
   ${CMAKE_SOURCE_DIR}/src/services/stubs.cpp
   ${CMAKE_SOURCE_DIR}/src/services/florence_tok.cpp
   $<$<BOOL:${NS_HAS_KOKORO}>:${CMAKE_SOURCE_DIR}/src/services/florence_engine.cpp>
@@ -136,12 +139,18 @@ qt_add_executable(t_uiprobe t_uiprobe.cpp
   ${CMAKE_SOURCE_DIR}/src/services/tts_service.cpp
   ${CMAKE_SOURCE_DIR}/src/services/tts_service.h
   ${CMAKE_SOURCE_DIR}/src/services/video_service.cpp
+  ${CMAKE_SOURCE_DIR}/src/services/video_service.h
   ${CMAKE_SOURCE_DIR}/src/services/mangadx_service.cpp
+  ${CMAKE_SOURCE_DIR}/src/services/mangadx_service.h
   ${CMAKE_SOURCE_DIR}/src/services/webtoon_service.cpp
+  ${CMAKE_SOURCE_DIR}/src/services/webtoon_service.h
   ${CMAKE_SOURCE_DIR}/src/services/kokoro_npz.cpp
   ${CMAKE_SOURCE_DIR}/src/services/kokoro_g2p.cpp
   ${CMAKE_SOURCE_DIR}/src/services/misaki_lite.cpp
   ${CMAKE_SOURCE_DIR}/src/services/kokoro_paths.cpp
+  ${CMAKE_SOURCE_DIR}/src/services/kokoro_engine.h
+  ${CMAKE_SOURCE_DIR}/src/services/rapid_ocr.h
+  ${CMAKE_SOURCE_DIR}/src/services/florence_engine.h
   ${CMAKE_SOURCE_DIR}/src/services/rapid_ocr_units.cpp
   ${CMAKE_SOURCE_DIR}/src/services/florence_tok.cpp
   ${CMAKE_SOURCE_DIR}/src/services/narrate.cpp
@@ -156,10 +165,15 @@ qt_add_executable(t_uiprobe t_uiprobe.cpp
   ${CMAKE_SOURCE_DIR}/src/ui/main_window.cpp
   ${CMAKE_SOURCE_DIR}/src/ui/main_window.h
   ${CMAKE_SOURCE_DIR}/src/ui/glass.cpp
+  ${CMAKE_SOURCE_DIR}/src/ui/glass.h
   ${CMAKE_SOURCE_DIR}/src/ui/timeline_widget.cpp
+  ${CMAKE_SOURCE_DIR}/src/ui/timeline_widget.h
   ${CMAKE_SOURCE_DIR}/src/ui/dialogs.cpp
+  ${CMAKE_SOURCE_DIR}/src/ui/dialogs.h
   ${CMAKE_SOURCE_DIR}/src/ui/theme.cpp
+  ${CMAKE_SOURCE_DIR}/src/ui/theme.h
   ${CMAKE_SOURCE_DIR}/src/ui/workers.cpp
+  ${CMAKE_SOURCE_DIR}/src/ui/workers.h
   ${CMAKE_SOURCE_DIR}/resources/app.qrc
 )
 target_include_directories(t_uiprobe PRIVATE ${CMAKE_SOURCE_DIR}/src)
