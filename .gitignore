@@ -1,6 +1,7 @@
 build/
 .vcpkg/
 temp/
+aqtinstall.log
 projects/*.db
 projects/*.db-*
 projects/autosave.db*
