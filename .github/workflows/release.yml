@@ -1,0 +1,39 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.2'
+          arch: win64_msvc2022_64
+          modules: qtmultimedia qtsvg qtimageformats qtpdf
+      - name: Install CMake + Ninja + NSIS
+        run: choco install cmake ninja nsis -y
+      - name: Fetch runtime files
+        run: powershell -ExecutionPolicy Bypass -File scripts/fetch-all.ps1
+      - name: Configure
+        run: cmake --preset release
+      - name: Build
+        run: cmake --build --preset release
+      - name: Test
+        run: ctest --test-dir build/release --output-on-failure
+      - name: Package (ZIP + NSIS)
+        run: |
+          cd build/release
+          cpack -G "ZIP;NSIS"
+      - name: Upload release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/release/*.zip
+            build/release/NarrationStudio-*-win64.exe
+          fail_on_unmatched_files: true

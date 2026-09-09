@@ -1,0 +1,18 @@
+build/
+.vcpkg/
+temp/
+projects/*.db
+projects/*.db-*
+projects/autosave.db*
+*.user
+.vs/
+out/
+*.zip
+# Model binaries (reproduced by scripts/fetch-*.ps1, bundled at release time)
+models/**/*.onnx
+models/**/*.bin
+third_party/onnxruntime/
+third_party/espeak-ng/
+third_party/ort-zip/
+third_party/ffmpeg/
+6.8.2/

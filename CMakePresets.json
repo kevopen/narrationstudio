@@ -1,0 +1,48 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 27, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Dev (Qt 6.8, Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.2/msvc2022_64",
+        "BUILD_TESTS": "ON",
+        "ENABLE_AI_BACKENDS": "OFF",
+        "QT_QML_GENERATE_QMLLS_INI": "OFF"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (portable + installer)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.2/msvc2022_64",
+        "BUILD_TESTS": "ON",
+        "ENABLE_AI_BACKENDS": "OFF"
+      }
+    },
+    {
+      "name": "release-ai",
+      "displayName": "Release + AI backends",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release-ai",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.2/msvc2022_64",
+        "BUILD_TESTS": "ON",
+        "ENABLE_AI_BACKENDS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev" },
+    { "name": "release", "configurePreset": "release" },
+    { "name": "release-ai", "configurePreset": "release-ai" }
+  ]
+}
