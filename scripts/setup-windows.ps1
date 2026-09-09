@@ -16,7 +16,7 @@ winget install --silent --accept-source-agreements --accept-package-agreements M
 
 # Qt via aqtinstall (lightweight, no Qt account needed)
 pip install -q aqtinstall
-$aqtArgs = "install-qt windows desktop $QtVersion win64_msvc2022_64 -O C:\Qt --archives qtbase qtmultimedia qtsvg qtimageformats"
+$aqtArgs = "install-qt windows desktop $QtVersion win64_msvc2022_64 -O C:\Qt --archives qtbase qtsvg --modules qtmultimedia qtimageformats qtpdf"
 Write-Host "Installing Qt: $aqtArgs"
 Invoke-Expression "aqt $aqtArgs"
 

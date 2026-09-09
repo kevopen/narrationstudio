@@ -8,12 +8,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ilammy/msvc-dev-cmd@v1
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.8.2'
-          arch: win64_msvc2022_64
-          modules: qtmultimedia qtsvg qtimageformats qtpdf
+      - name: Install Qt 6.8.2
+        # qtsvg ships as an archive (not a module) in 6.8, so install-qt-action
+        # can't fetch it — manual aqt call with the proven archive+module mix.
+        run: |
+          pip install -q aqtinstall
+          aqt install-qt windows desktop 6.8.2 win64_msvc2022_64 -O C:\Qt --archives qtbase qtsvg --modules qtmultimedia qtimageformats qtpdf
+          echo "CMAKE_PREFIX_PATH=C:/Qt/6.8.2/msvc2022_64" >> $GITHUB_ENV
       - name: Install CMake + Ninja
         run: choco install cmake ninja -y
       - name: Configure
