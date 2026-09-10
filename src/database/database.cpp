@@ -44,6 +44,8 @@ bool Database::migrate(QSqlDatabase &db, QString *error) {
   if (!exec("CREATE TABLE IF NOT EXISTS page_characters (page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE, character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE, PRIMARY KEY (page_id, character_id))")) return false;
   // Measured page-boundary seconds (timeline markers) for the voiced audio.
   if (!exec("CREATE TABLE IF NOT EXISTS audio_markers (project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE, idx INTEGER NOT NULL, seconds REAL NOT NULL, PRIMARY KEY (project_id, idx))")) return false;
+  if (!hasColumn(db, "pages", "excluded"))
+    if (!exec("ALTER TABLE pages ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0")) return false;
   return true;
 }
 

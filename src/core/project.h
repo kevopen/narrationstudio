@@ -11,6 +11,7 @@ struct TextBlock { QString content; QString type = "dialogue"; QString speaker; 
 struct Page {
   int number = 0; QString imagePath; QString description;
   QVector<TextBlock> blocks; QStringList cast;
+  bool excluded = false;   // user-excluded from export (after synthesis review)
 };
 struct Character { qlonglong id = 0; QString name; QString role; QString voiceStyle; };
 

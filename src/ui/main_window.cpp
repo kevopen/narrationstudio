@@ -37,9 +37,11 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QProcess>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSet>
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QStatusBar>
@@ -150,6 +152,8 @@ void MainWindow::buildDocks() {
   m_pageList->setResizeMode(QListView::Adjust);
   m_pageList->setSpacing(2);
   connect(m_pageList, &QListWidget::currentRowChanged, this, &MainWindow::onPageSelected);
+  m_pageList->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(m_pageList, &QWidget::customContextMenuRequested, this, &MainWindow::onPageContextMenu);
   left->setWidget(m_pageList);
   addDockWidget(Qt::LeftDockWidgetArea, left);
 
@@ -912,7 +916,7 @@ void MainWindow::runSynthesize() {
              : QString("Voiced pages %1-%2 seamlessly (%3 estimated markers).").arg(from).arg(to).arg(markers.size()));
   });
   connect(task, &Task::progress, this, [this](int p, const QString &s){ setStatus(s, p); });
-  connect(task, &Task::done, this, [this]{ autosave(); });
+  connect(task, &Task::done, this, [this]{ autosave(); reviewNarrations(); });
   connect(task, &Task::done, this, [this]{ setBusy(false); });
   connect(task, &Task::error, this, [this](const QString &e){ setStatus("Voice failed: " + e); });
   connect(task, &Task::error, this, [this](const QString &){ setBusy(false); });
@@ -939,16 +943,51 @@ void MainWindow::runExport() {
     setStatus("Export needs ffmpeg - run scripts/fetch-ffmpeg.ps1, or install ffmpeg on PATH.");
     return;
   }
+  // Count excluded pages
+  int excludedCount = 0;
+  for (auto &pg : m_project.pages)
+    if (pg.number >= from && pg.number <= to && pg.excluded) excludedCount++;
+  if (excludedCount > 0) {
+    QMessageBox box(this);
+    box.setWindowTitle("Export with Excluded Pages");
+    box.setIcon(QMessageBox::Information);
+    box.setText(QString("%1 page(s) will be excluded from export.\nContinue?").arg(excludedCount));
+    box.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+    if (box.exec() != QMessageBox::Yes) return;
+  }
   ExportDialog::Result r;
   ExportDialog dlg(r, this);
   if (dlg.exec() != QDialog::Accepted) return;
   QString out = QFileDialog::getSaveFileName(this, "Export MP4", "output.mp4", "MP4 (*.mp4)");
   if (out.isEmpty()) return;
-  // Python parity: the video covers the active work range with its markers.
+  // Filter excluded pages: build image list and collect excluded indices
   QStringList imgs;
-  for (auto &pg : m_project.pages)
-    if (pg.number >= from && pg.number <= to) imgs << pg.imagePath;
-  const double total = wavSeconds(m_project.audioPath);
+  QSet<int> excludedIndices;
+  int imgIdx = 0;
+  for (auto &pg : m_project.pages) {
+    if (pg.number >= from && pg.number <= to) {
+      if (pg.excluded) {
+        excludedIndices.insert(imgIdx);
+      } else {
+        imgs << pg.imagePath;
+      }
+      imgIdx++;
+    }
+  }
+  if (imgs.isEmpty()) { setStatus("All pages in work range are excluded - nothing to export."); return; }
+  // Handle audio: if excluded pages have audio, splice it out
+  QString audioPath = m_project.audioPath;
+  if (!excludedIndices.isEmpty() && !audioPath.isEmpty() && QFile::exists(audioPath)) {
+    // Slice the master WAV into per-page segments, then merge non-excluded ones
+    const QString sliceDir = QDir::current().absoluteFilePath("temp/slices");
+    QStringList pageWavs = VideoService::sliceAudio(audioPath, m_project.markers, sliceDir);
+    if (!pageWavs.isEmpty()) {
+      const QString merged = QDir::current().absoluteFilePath("temp/export_audio.wav");
+      QString mergedPath = VideoService::mergeAudio(pageWavs, excludedIndices, merged);
+      if (!mergedPath.isEmpty()) audioPath = mergedPath;
+    }
+  }
+  const double total = wavSeconds(audioPath);
   if (total <= 0)
     setStatus("Note: no voiced audio - exporting silent video at 5s per page.");
   QVector<double> durs = NS::Timeline::markersToDurations(
@@ -961,16 +1000,16 @@ void MainWindow::runExport() {
   auto *cancelBtn = new QPushButton("Cancel export", this);
   cancelBtn->setObjectName("ghost");
   statusBar()->addPermanentWidget(cancelBtn);
-  setStep(QString("Step 6/6 | Exporting pages %1-%2 (%3 frames)...").arg(from).arg(to).arg(imgs.size()));
+  setStep(QString("Step 6/6 | Exporting %1 pages (%2 excluded)...").arg(imgs.size()).arg(excludedCount));
   auto *task = new Task([=](auto progress, auto cancelled) {
     VideoService vs;
     QString err;
-    QString res = vs.exportSlideshow(imgs, m_project.audioPath, out, durs, opt, &err,
+    QString res = vs.exportSlideshow(imgs, audioPath, out, durs, opt, &err,
       [&](int pct, const QString &s){ progress(pct, s); },
       [&](){ return cancelled(); });
     if (res.isEmpty()) throw std::runtime_error(err.toStdString());
-    QMetaObject::invokeMethod(this, [this, res, from, to]{
-      setStatus(QString("Exported pages %1-%2 to %3").arg(from).arg(to).arg(res));
+    QMetaObject::invokeMethod(this, [this, res, imgs]{
+      setStatus(QString("Exported %1 pages to %2").arg(imgs.size()).arg(res));
     }, Qt::QueuedConnection);
     progress(100, "Export done.");
   });
@@ -1120,17 +1159,6 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *ev) {
   return QMainWindow::eventFilter(obj, ev);
 }
 
-void MainWindow::refreshPageList() {
-  m_pageList->clear();
-  for (auto &pg : m_project.pages) {
-    auto *item = new QListWidgetItem(
-      QIcon(), QString("Pg %1").arg(pg.number), m_pageList);
-    item->setData(Qt::UserRole, pg.imagePath);
-    item->setTextAlignment(Qt::AlignHCenter);
-  }
-  loadThumbnails();
-}
-
 // Lazy gallery thumbnails: one background task decodes small previews
 // (full-res decode still happens per-page in showPage).
 // Threading rules: QImage may cross threads (implicitly shared), but QPixmap
@@ -1235,6 +1263,102 @@ void MainWindow::showPage(int idx) {
     });
     lo->addWidget(pill);
   }
+}
+
+void MainWindow::onPageContextMenu(const QPoint &pos) {
+  QListWidgetItem *hit = m_pageList->itemAt(pos);
+  if (!hit) return;
+  int row = m_pageList->row(hit);
+  if (row < 0 || row >= m_project.pages.size()) return;
+  const int pgNum = m_project.pages[row].number;
+  const bool isExcluded = m_project.pages[row].excluded;
+  QMenu menu(this);
+  menu.addAction(isExcluded ? "Include in export" : "Exclude from export", this, [this, row]{
+    m_project.pages[row].excluded = !m_project.pages[row].excluded;
+    refreshPageList();
+    if (m_current == row) showPage(row);
+    autosave();
+  });
+  menu.addSeparator();
+  if (!m_project.audioPath.isEmpty() && QFile::exists(m_project.audioPath)) {
+    menu.addAction("Play page narration", this, [this, row, pgNum]{
+      auto [from, to] = m_project.workRange();
+      const QVector<double> &mk = m_project.markers;
+      if (mk.isEmpty() && m_project.pages.size() > 1) return;
+      const int pgIdx = row - from + 1;
+      if (pgIdx < 0 || pgIdx > mk.size()) return;
+      const double start = (pgIdx == 0) ? 0.0 : mk[pgIdx - 1];
+      const double end = (pgIdx < mk.size()) ? mk[pgIdx] : wavSeconds(m_project.audioPath);
+      const QString seg = QDir::current().absoluteFilePath(
+        QString("temp/preview_page_%1.wav").arg(pgNum));
+      QDir().mkpath("temp");
+      QProcess proc;
+      proc.start(VideoService::resolveFfmpeg(),
+        {"-y", "-i", m_project.audioPath,
+         "-ss", QString::number(start, 'f', 4),
+         "-to", QString::number(end, 'f', 4),
+         "-c", "copy", seg});
+      proc.waitForFinished(10000);
+      if (QFile::exists(seg)) {
+        m_preview->stop();
+        m_preview->setSource(QUrl::fromLocalFile(seg));
+        m_preview->play();
+        setStatus(QString("Playing page %1 narration (%2-%3s)").arg(pgNum)
+                     .arg(start, 0, 'f', 2).arg(end, 0, 'f', 2));
+      }
+    });
+    menu.addAction("Stop playback", this, [this]{
+      m_preview->stop();
+    });
+  }
+  menu.exec(m_pageList->mapToGlobal(pos));
+}
+
+void MainWindow::reviewNarrations() {
+  auto [from, to] = m_project.workRange();
+  if (m_project.audioPath.isEmpty() || !QFile::exists(m_project.audioPath)) {
+    setStatus("No audio to review - synthesize first.");
+    return;
+  }
+  // Auto-detect textless pages and show a review summary
+  int textlessCount = 0;
+  QStringList textlessPages;
+  for (auto &pg : m_project.pages) {
+    if (pg.number >= from && pg.number <= to && pg.blocks.isEmpty()) {
+      textlessCount++;
+      textlessPages << QString("Page %1").arg(pg.number);
+    }
+  }
+  if (textlessCount == 0) {
+    setStatus("No textless pages detected in work range.");
+    return;
+  }
+  QMessageBox box(this);
+  box.setWindowTitle("Narration Review");
+  box.setIcon(QMessageBox::Information);
+  box.setText(QString("Found %1 textless page(s) with potentially less accurate narrations:\n\n%2\n\n"
+                      "Right-click pages in the gallery to exclude them from export, "
+                      "or click 'Play page narration' to preview each one.")
+               .arg(textlessCount).arg(textlessPages.join(", ")));
+  box.setStandardButtons(QMessageBox::Ok);
+  box.exec();
+}
+
+void MainWindow::refreshPageList() {
+  m_pageList->clear();
+  for (auto &pg : m_project.pages) {
+    auto *item = new QListWidgetItem(
+      QIcon(), QString("Pg %1").arg(pg.number), m_pageList);
+    item->setData(Qt::UserRole, pg.imagePath);
+    item->setTextAlignment(Qt::AlignHCenter);
+    if (pg.excluded) {
+      item->setForeground(QColor(128, 128, 128));
+      item->setToolTip("Excluded from export");
+    } else {
+      item->setToolTip("");
+    }
+  }
+  loadThumbnails();
 }
 
 void MainWindow::autosave() {

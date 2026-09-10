@@ -38,6 +38,20 @@ public:
   static bool renderFrame(const QString &srcPath, const QString &outPath,
                           int w, int h, const QString &bgMode, const QString &bgImage);
 
+  // Slice a master WAV into per-page segments using markers.
+  // Returns list of output WAV paths (one per page, 0-indexed).
+  static QStringList sliceAudio(const QString &masterWav,
+                                const QVector<double> &markers,
+                                const QString &outDir);
+
+  // Concatenate only non-excluded page WAVs into a new master.
+  // pageAudio: per-page WAV paths (indexed 0..N-1)
+  // excluded: set of page indices to skip
+  // Returns output WAV path.
+  static QString mergeAudio(const QStringList &pageAudio,
+                            const QSet<int> &excluded,
+                            const QString &outPath);
+
 private:
   QString m_ffmpeg;
 };

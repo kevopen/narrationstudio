@@ -12,6 +12,7 @@
 #include <QTextStream>
 #include <QThreadPool>
 #include <QtConcurrent>
+#include <QtConcurrent>
 
 VideoService::VideoService(const QString &ffmpegExe, QObject *parent)
   : QObject(parent),
@@ -251,4 +252,66 @@ QString VideoService::exportSlideshow(const QStringList &images, const QString &
   }
   if (progress) progress(100, "Export done.");
   return output;
+}
+
+QStringList VideoService::sliceAudio(const QString &masterWav,
+                                     const QVector<double> &markers,
+                                     const QString &outDir) {
+  QStringList result;
+  if (!QFile::exists(masterWav)) return result;
+  QDir().mkpath(outDir);
+  const QString ffmpeg = resolveFfmpeg();
+  const int count = markers.size() + 1;
+  // Build time boundaries: [0, m0, m1, ..., mN-1, total]
+  QFile f(masterWav);
+  double total = 0;
+  if (f.open(QIODevice::ReadOnly) && f.size() > 44) {
+    QByteArray hdr = f.read(44);
+    const uchar *p = reinterpret_cast<const uchar*>(hdr.constData());
+    auto r32 = [&](int o){ return quint32(p[o])|(quint32(p[o+1])<<8)|(quint32(p[o+2])<<16)|(quint32(p[o+3])<<24); };
+    const quint32 rate = r32(24), bytes = r32(40);
+    if (rate > 0 && bytes > 0) total = bytes / (rate * 2.0); // mono 16-bit
+  }
+  QVector<double> bounds;
+  bounds << 0.0;
+  for (double m : markers) bounds << m;
+  bounds << total;
+  for (int i = 0; i < count; ++i) {
+    const double start = bounds[i];
+    const double end = (i < bounds.size() - 1) ? bounds[i + 1] : total;
+    const QString out = QDir(outDir).absoluteFilePath(QString("page_%1.wav").arg(i + 1));
+    QProcess proc;
+    proc.start(ffmpeg, {"-y", "-i", masterWav,
+                        "-ss", QString::number(start, 'f', 4),
+                        "-to", QString::number(end, 'f', 4),
+                        "-c", "copy", out});
+    proc.waitForFinished(30000);
+    if (proc.exitStatus() == QProcess::NormalExit && proc.exitCode() == 0 && QFile::exists(out))
+      result << out;
+  }
+  return result;
+}
+
+QString VideoService::mergeAudio(const QStringList &pageAudio,
+                                 const QSet<int> &excluded,
+                                 const QString &outPath) {
+  if (pageAudio.isEmpty()) return {};
+  const QString ffmpeg = resolveFfmpeg();
+  const QString listFile = outPath + ".txt";
+  QFile listF(listFile);
+  if (!listF.open(QIODevice::WriteOnly | QIODevice::Text)) return {};
+  QTextStream ts(&listF);
+  for (int i = 0; i < pageAudio.size(); ++i) {
+    if (excluded.contains(i)) continue;
+    if (!QFile::exists(pageAudio[i])) continue;
+    ts << "file '" << QDir::current().relativeFilePath(pageAudio[i]) << "'\n";
+  }
+  listF.close();
+  QProcess proc;
+  proc.start(ffmpeg, {"-y", "-f", "concat", "-safe", "0", "-i", listFile,
+                      "-c", "copy", outPath});
+  proc.waitForFinished(60000);
+  QFile::remove(listFile);
+  if (proc.exitStatus() != QProcess::NormalExit || proc.exitCode() != 0) return {};
+  return QFile::exists(outPath) ? outPath : QString();
 }

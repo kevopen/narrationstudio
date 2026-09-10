@@ -27,6 +27,7 @@ private slots:
       pg.blocks << b;
       if (n < 3) pg.cast << "MC";
       if (n > 1) pg.cast << "Yuki";
+      pg.excluded = (n == 2);
       p.pages << pg;
     }
     QDir().mkpath("temp");
@@ -54,6 +55,9 @@ private slots:
     QCOMPARE(q.pages[0].cast, QStringList({"MC"}));
     QCOMPARE(q.pages[1].cast.size(), 2);
     QCOMPARE(q.pages[2].description, QString("Desc 3"));
+    QCOMPARE(q.pages[0].excluded, false);
+    QCOMPARE(q.pages[1].excluded, true);
+    QCOMPARE(q.pages[2].excluded, false);
     // connection hygiene: no leaked handles per open
     qInfo() << "connections:" << QSqlDatabase::connectionNames().size();
     QCOMPARE(QSqlDatabase::connectionNames().size(), 0);

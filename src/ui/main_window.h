@@ -40,6 +40,7 @@ private slots:
   void runDescribe();
   void runNarrate();
   void runSynthesize();
+  void reviewNarrations();
   void runExport();
   void saveProject();
   void loadProject();
@@ -71,6 +72,7 @@ private:
   bool eventFilter(QObject *obj, QEvent *ev) override;
   void closeEvent(QCloseEvent *ev) override;
   void setStep(const QString &s);
+  void onPageContextMenu(const QPoint &pos);
 
   void setStatus(const QString &s, int pct = -1);
   void setBusy(bool busy);   // locks workflow steps while one runs

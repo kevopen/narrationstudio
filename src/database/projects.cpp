@@ -62,8 +62,8 @@ bool ProjectStore::save(const QString &dbPath, const Project &p, QString *error)
     charIds[c.name] = q.lastInsertId().toLongLong();
   }
   for (const auto &pg : p.pages) {
-    q.prepare("INSERT INTO pages (project_id, image_path, page_number, description) VALUES (?,?,?,?)");
-    q.addBindValue(pid); q.addBindValue(nn(pg.imagePath)); q.addBindValue(pg.number); q.addBindValue(nn(pg.description));
+    q.prepare("INSERT INTO pages (project_id, image_path, page_number, description, excluded) VALUES (?,?,?,?,?)");
+    q.addBindValue(pid); q.addBindValue(nn(pg.imagePath)); q.addBindValue(pg.number); q.addBindValue(nn(pg.description)); q.addBindValue(pg.excluded ? 1 : 0);
     if (!q.exec()) return fail("insert page");
     qlonglong pageId = q.lastInsertId().toLongLong();
     for (const auto &b : pg.blocks) {
@@ -113,11 +113,12 @@ bool ProjectStore::load(const QString &dbPath, Project &p, QString *error) {
     c.name = q.value(1).toString(); c.role = q.value(2).toString(); c.voiceStyle = q.value(3).toString();
     idToName[c.id] = c.name; p.characters.append(c);
   }
-  q.prepare("SELECT id, image_path, page_number, description FROM pages WHERE project_id=? ORDER BY page_number");
+  q.prepare("SELECT id, image_path, page_number, description, excluded FROM pages WHERE project_id=? ORDER BY page_number");
   q.addBindValue(pid); q.exec();
   while (q.next()) {
     Page pg; qlonglong pageId = q.value(0).toLongLong();
     pg.imagePath = q.value(1).toString(); pg.number = q.value(2).toInt(); pg.description = q.value(3).toString();
+    pg.excluded = q.value(4).toBool();
     QSqlQuery b(db);
     b.prepare("SELECT content, type FROM text_blocks WHERE page_id=?");
     b.addBindValue(pageId); b.exec();
