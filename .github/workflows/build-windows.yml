@@ -36,7 +36,9 @@ jobs:
         timeout-minutes: 10
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --test-dir build/release --output-on-failure --timeout 120
+        run: |
+          $env:Path = "C:\Qt\6.8.2\msvc2022_64\bin;" + $env:Path
+          ctest --test-dir build/release --output-on-failure --timeout 120
       - name: Package (zip)
         run: |
           cd build/release
