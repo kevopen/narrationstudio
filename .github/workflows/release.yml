@@ -37,7 +37,10 @@ jobs:
       - name: Build
         run: cmake --build --preset release
       - name: Test
-        run: ctest --test-dir build/release --output-on-failure
+        timeout-minutes: 10
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build/release --output-on-failure --timeout 120
       - name: Package (ZIP + NSIS)
         run: |
           cd build/release
