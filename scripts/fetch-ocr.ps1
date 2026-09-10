@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Force $tmp | Out-Null
 Write-Host "downloading rapidocr_onnxruntime $PkgVersion…" -ForegroundColor Cyan
 pip download "rapidocr_onnxruntime==$PkgVersion" --no-deps -d $tmp
 $whl = Get-ChildItem $tmp -Filter "*.whl" | Select-Object -First 1
-if (!$whl) { throw "pip download failed — is Python/pip installed?" }
+if (!$whl) { throw "pip download failed - is Python/pip installed?" }
 $zip = Join-Path $tmp "pkg.zip"
 Copy-Item $whl.FullName $zip -Force
 $pkg = Join-Path $tmp "pkg"
