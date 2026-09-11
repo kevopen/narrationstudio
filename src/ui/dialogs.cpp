@@ -575,6 +575,16 @@ SettingsDialog::SettingsDialog(AppSettings &settings, QWidget *parent)
   QLineEdit *gemModel = textRow("Model", settings.geminiModel(), "gemini-3.6-flash");
   QLineEdit *gemFall = textRow("Fallbacks", settings.geminiFallbacks(), "comma-separated models");
 
+  groupLabel("Describe API (Gemini Vision - scene descriptions)");
+  auto *descKeys = new QPlainTextEdit(this);
+  descKeys->setPlainText(settings.describeKeys().join("\n"));
+  descKeys->setPlaceholderText("API keys, one per line - auto-rotates on quota (blank to use Florence-2 local)");
+  descKeys->setFixedHeight(56);
+  lay->addWidget(new QLabel("Keys", this));
+  lay->addWidget(descKeys);
+  QLineEdit *descModel = textRow("Model", settings.describeModel(), "gemini-3.5-flash-lite");
+  QLineEdit *descFall = textRow("Fallbacks", settings.describeFallbacks(), "comma-separated models");
+
   groupLabel("Ollama (local, offline)");
   QLineEdit *olUrl = textRow("URL", settings.ollamaUrl(), "http://localhost:11434");
   QLineEdit *olModel = textRow("Model", settings.ollamaModel(), "llama3.2");
@@ -638,7 +648,7 @@ SettingsDialog::SettingsDialog(AppSettings &settings, QWidget *parent)
 
   auto *btns = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, this);
   QObject::connect(btns, &QDialogButtonBox::accepted, this,
-                   [&, llmKeys, llmBase, llmModel, gemKeys, gemModel, gemFall, olUrl, olModel]{
+                   [&, llmKeys, llmBase, llmModel, gemKeys, gemModel, gemFall, descKeys, descModel, descFall, olUrl, olModel]{
     auto keysOf = [](QPlainTextEdit *e) {
       QStringList out;
       for (const QString &t : e->toPlainText().split(QRegularExpression("[\n,;]+"), Qt::SkipEmptyParts)) {
@@ -653,6 +663,9 @@ SettingsDialog::SettingsDialog(AppSettings &settings, QWidget *parent)
     settings.setGeminiKeys(keysOf(gemKeys));
     settings.setGeminiModel(gemModel->text().trimmed());
     settings.setGeminiFallbacks(gemFall->text().trimmed());
+    settings.setDescribeKeys(keysOf(descKeys));
+    settings.setDescribeModel(descModel->text().trimmed());
+    settings.setDescribeFallbacks(descFall->text().trimmed());
     settings.setOllamaUrl(olUrl->text().trimmed());
     settings.setOllamaModel(olModel->text().trimmed());
     accept();

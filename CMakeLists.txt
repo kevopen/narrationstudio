@@ -48,6 +48,7 @@ set(APP_SOURCES
   src/services/engines.h
   src/services/stubs.cpp
   src/services/tts_service.cpp src/services/tts_service.h
+  src/services/gemini_describe.cpp src/services/gemini_describe.h
   src/services/video_service.cpp src/services/video_service.h
   src/services/mangadx_service.cpp src/services/mangadx_service.h
   src/services/webtoon_service.cpp src/services/webtoon_service.h

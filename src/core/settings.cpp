@@ -59,6 +59,12 @@ QStringList AppSettings::geminiKeys() const {
   return pool;
 }
 void AppSettings::setGeminiKeys(const QStringList &v) { m_s.setValue("ai/geminiKeys", v.join("\n")); }
+QStringList AppSettings::describeKeys() const { return splitKeys(m_s.value("ai/describeKeys").toString()); }
+void AppSettings::setDescribeKeys(const QStringList &v) { m_s.setValue("ai/describeKeys", v.join("\n")); }
+QString AppSettings::describeModel() const { return m_s.value("ai/describeModel", "gemini-3.5-flash-lite").toString(); }
+void AppSettings::setDescribeModel(const QString &v) { m_s.setValue("ai/describeModel", v); }
+QString AppSettings::describeFallbacks() const { return m_s.value("ai/describeFallbacks", "gemini-3.6-flash,gemini-3.5-flash").toString(); }
+void AppSettings::setDescribeFallbacks(const QString &v) { m_s.setValue("ai/describeFallbacks", v); }
 QString AppSettings::llmBase() const { return m_s.value("ai/llmBase", "https://api.groq.com/openai/v1").toString(); }
 void AppSettings::setLlmBase(const QString &v) { m_s.setValue("ai/llmBase", v); }
 QString AppSettings::llmModel() const { return m_s.value("ai/llmModel", "llama-3.1-8b-instant").toString(); }

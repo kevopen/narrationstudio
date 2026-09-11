@@ -26,6 +26,9 @@ public:
   QString llmKey() const;       void setLlmKey(const QString &v);
   QStringList llmKeys() const;  void setLlmKeys(const QStringList &v);
   QStringList geminiKeys() const; void setGeminiKeys(const QStringList &v);
+  QStringList describeKeys() const; void setDescribeKeys(const QStringList &v);
+  QString describeModel() const;  void setDescribeModel(const QString &v);
+  QString describeFallbacks() const; void setDescribeFallbacks(const QString &v);
   QString llmBase() const;      void setLlmBase(const QString &v);
   QString llmModel() const;     void setLlmModel(const QString &v);
   int workStart() const;        void setWorkStart(int v);

@@ -138,6 +138,8 @@ qt_add_executable(t_uiprobe t_uiprobe.cpp
   ${CMAKE_SOURCE_DIR}/src/services/stubs.cpp
   ${CMAKE_SOURCE_DIR}/src/services/tts_service.cpp
   ${CMAKE_SOURCE_DIR}/src/services/tts_service.h
+  ${CMAKE_SOURCE_DIR}/src/services/gemini_describe.cpp
+  ${CMAKE_SOURCE_DIR}/src/services/gemini_describe.h
   ${CMAKE_SOURCE_DIR}/src/services/video_service.cpp
   ${CMAKE_SOURCE_DIR}/src/services/video_service.h
   ${CMAKE_SOURCE_DIR}/src/services/mangadx_service.cpp

@@ -17,6 +17,7 @@
 #include "services/tts_service.h"
 #include "services/webtoon_service.h"
 #include "services/engines.h"
+#include "services/gemini_describe.h"
 #include "services/video_service.h"
 #include "timeline_widget.h"
 #include "workers.h"
@@ -615,36 +616,66 @@ void MainWindow::runOcr() {
 
 void MainWindow::runDescribe() {
   auto [from, to] = m_project.workRange();
+  const QStringList descKeys = m_settings.describeKeys();
+  const bool useGemini = !descKeys.isEmpty();
   QString reason;
-  const bool useFlorence = FlorenceCaptionEngine::available(&reason);
-  if (!useFlorence && m_project.pages.isEmpty()) { setStatus("Nothing to describe."); return; }
-  setStep(useFlorence ? QString("Step 3/6 | Describing pages %1-%2 with Florence-2...").arg(from).arg(to)
-                      : QString("Step 3/6 | Describing pages %1-%2... (%1)").arg(from).arg(to).arg(reason));
-  struct Job { int pageIdx; QString path; };
+  const bool useFlorence = !useGemini && FlorenceCaptionEngine::available(&reason);
+  if (!useGemini && !useFlorence && m_project.pages.isEmpty()) { setStatus("Nothing to describe."); return; }
+  if (useGemini) {
+    setStep(QString("Step 3/6 | Describing pages %1-%2 with Gemini Vision (%3 keys)...").arg(from).arg(to).arg(descKeys.size()));
+  } else if (useFlorence) {
+    setStep(QString("Step 3/6 | Describing pages %1-%2 with Florence-2...").arg(from).arg(to));
+  } else {
+    setStep(QString("Step 3/6 | Describing pages %1-%2... (%3)").arg(from).arg(to).arg(reason));
+  }
+  struct Job { int pageIdx; QString path; int pgNum; };
   QVector<Job> jobs;
   for (qsizetype i = 0; i < m_project.pages.size(); ++i) {
     const auto &pg = m_project.pages[i];
     if (pg.number < from || pg.number > to) continue;
-    if (!pg.description.isEmpty()) continue; // keep user-written notes
-    jobs.append({static_cast<int>(i), pg.imagePath});
+    if (!pg.description.isEmpty()) continue;
+    jobs.append({static_cast<int>(i), pg.imagePath, pg.number});
   }
   if (jobs.isEmpty()) { setStatus("Nothing to describe (pages already have notes)."); return; }
-  auto *task = new Task([this, jobs, useFlorence](auto progress, auto cancelled) {
-    FlorenceCaptionEngine eng; // sessions init once, reused per page
+  const QStringList descModels = {m_settings.describeModel()};
+  const QStringList descFallbacks = m_settings.describeFallbacks().split(',', Qt::SkipEmptyParts);
+  const QString synopsis = m_project.synopsis;
+  auto *task = new Task([this, jobs, useGemini, useFlorence, descKeys, descModels, descFallbacks, synopsis](auto progress, auto cancelled) {
+    GeminiDescribeEngine *gemEng = nullptr;
+    FlorenceCaptionEngine floEng;
+    if (useGemini) {
+      gemEng = new GeminiDescribeEngine(descKeys, descModels.first(), descFallbacks);
+      gemEng->setSynopsis(synopsis);
+    }
     int done = 0;
+    QStringList priorDescs; // accumulate for context continuity
     for (qsizetype j = 0; j < jobs.size(); ++j) {
-      if (cancelled()) return;
+      if (cancelled()) { delete gemEng; return; }
       progress(static_cast<int>(j * 100 / jobs.size()),
                QString("Describing page %1/%2...").arg(j + 1).arg(jobs.size()));
       QString desc;
-      if (useFlorence) {
+      if (gemEng) {
+        // Build context from previous pages' descriptions
+        if (!priorDescs.isEmpty()) {
+          QStringList ctx;
+          int start = qMax(0, priorDescs.size() - 5);
+          for (int k = start; k < priorDescs.size(); ++k)
+            ctx << QString("- Page %1: %2").arg(jobs[k].pgNum).arg(priorDescs[k]);
+          gemEng->setContext(ctx.join("\n"));
+        }
         QString err;
-        desc = eng.describe(jobs[j].path, &err);
+        desc = gemEng->describe(jobs[j].path, &err);
+        if (!err.isEmpty() && desc.isEmpty())
+          throw std::runtime_error(err.toStdString());
+      } else if (useFlorence) {
+        QString err;
+        desc = floEng.describe(jobs[j].path, &err);
         if (!err.isEmpty() && desc.isEmpty())
           throw std::runtime_error(err.toStdString());
       } else {
-        desc = "(auto-describe stub - plug Florence-2 ONNX here)";
+        desc = "(auto-describe stub - configure describe keys or install Florence-2)";
       }
+      priorDescs << desc;
       const int idx = jobs[j].pageIdx;
       QMetaObject::invokeMethod(this, [this, idx, desc]{
         if (idx >= 0 && idx < m_project.pages.size()
@@ -653,6 +684,7 @@ void MainWindow::runDescribe() {
       }, Qt::BlockingQueuedConnection);
       ++done;
     }
+    delete gemEng;
     QMetaObject::invokeMethod(this, [this, done]{
       showPage(m_current);
       setStep(QString("Step 3/6 | Described %1 pages.").arg(done));
