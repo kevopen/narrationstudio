@@ -24,6 +24,7 @@
 #include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
+#include <QScrollArea>
 #include <QSplitter>
 #include <QStyle>
 #include <QTabBar>
@@ -526,7 +527,15 @@ SettingsDialog::SettingsDialog(AppSettings &settings, QWidget *parent)
   : QDialog(parent) {
   setWindowTitle("Settings - AI narration");
   resize(520, 420);
-  auto *lay = new QVBoxLayout(this);
+  auto *outer = new QVBoxLayout(this);
+  outer->setContentsMargins(0, 0, 0, 0);
+
+  auto *scroll = new QScrollArea(this);
+  scroll->setWidgetResizable(true);
+  scroll->setFrameShape(QFrame::NoFrame);
+  auto *inner = new QWidget();
+  auto *lay = new QVBoxLayout(inner);
+  lay->setContentsMargins(8, 8, 8, 8);
 
   auto *hint = new QLabel(
     "Backend priority: cloud API first, then Gemini, then local Ollama. "
@@ -645,6 +654,8 @@ SettingsDialog::SettingsDialog(AppSettings &settings, QWidget *parent)
     }));
   });
   lay->addStretch(1);
+  scroll->setWidget(inner);
+  outer->addWidget(scroll, 1);
 
   auto *btns = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, this);
   QObject::connect(btns, &QDialogButtonBox::accepted, this,
@@ -671,7 +682,7 @@ SettingsDialog::SettingsDialog(AppSettings &settings, QWidget *parent)
     accept();
   });
   QObject::connect(btns, &QDialogButtonBox::rejected, this, &QDialog::reject);
-  lay->addWidget(btns);
+  outer->addWidget(btns);
 }
 
 // ---- Page description popup editor ----
