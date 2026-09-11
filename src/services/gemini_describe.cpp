@@ -124,7 +124,7 @@ QString GeminiDescribeEngine::describe(const QString &imagePath, QString *error)
         if (!m_deadKeys.contains(idx)) { ki = idx; break; }
       }
       if (ki < 0) break;
-      m_keyIdx = ki;
+      m_keyIdx = (ki + 1) % m_keys.size(); // advance for next attempt
 
       QString err;
       QString result = postGemini(model, m_keys[ki], body, &err);
@@ -139,6 +139,9 @@ QString GeminiDescribeEngine::describe(const QString &imagePath, QString *error)
       }
       if (errLow.contains("model not found") || errLow.contains("not_found"))
         break;
+      // Other error: log and try next key (don't retry same key)
+      if (error && error->isEmpty())
+        *error = QString("Key %1: %2").arg(ki + 1).arg(err);
     }
   }
 

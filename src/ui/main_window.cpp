@@ -667,6 +667,8 @@ void MainWindow::runDescribe() {
         desc = gemEng->describe(jobs[j].path, &err);
         if (!err.isEmpty() && desc.isEmpty())
           throw std::runtime_error(err.toStdString());
+        if (desc.isEmpty())
+          throw std::runtime_error("Gemini returned empty description for page " + QByteArray::number(jobs[j].pgNum).toStdString());
       } else if (useFlorence) {
         QString err;
         desc = floEng.describe(jobs[j].path, &err);
