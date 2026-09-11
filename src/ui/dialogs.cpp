@@ -533,7 +533,10 @@ SettingsDialog::SettingsDialog(AppSettings &settings, QWidget *parent)
   auto *scroll = new QScrollArea(this);
   scroll->setWidgetResizable(true);
   scroll->setFrameShape(QFrame::NoFrame);
+  scroll->viewport()->setAutoFillBackground(false);
+  scroll->setStyleSheet("QScrollArea{background:transparent;border:none;} QScrollArea> QWidget> QWidget{background:transparent;}");
   auto *inner = new QWidget();
+  inner->setAutoFillBackground(false);
   auto *lay = new QVBoxLayout(inner);
   lay->setContentsMargins(8, 8, 8, 8);
 
