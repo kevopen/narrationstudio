@@ -1,15 +1,11 @@
 #include "gemini_describe.h"
+#include "tts_service.h"
 #include <QBuffer>
-#include <QFile>
 #include <QImage>
 #include <QImageReader>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QNetworkReply>
-#include <QUrl>
-#include <QUuid>
-#include <stdexcept>
 
 GeminiDescribeEngine::GeminiDescribeEngine(const QStringList &keys,
                                            const QString &model,
@@ -34,45 +30,46 @@ static QByteArray imageToBase64(const QString &path, QString *error) {
 
 QString GeminiDescribeEngine::postGemini(const QString &model, const QString &key,
                                          const QJsonObject &body, QString *error) {
-  const QString urlStr = QString(
+  const QString url = QStringLiteral(
     "https://generativelanguage.googleapis.com/v1beta/models/%1:generateContent")
     .arg(model);
-  QUrl urlObj(urlStr);
-  QNetworkRequest req(urlObj);
-  req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-  req.setRawHeader("x-goog-api-key", key.toUtf8());
-  QNetworkReply *reply = m_nam.post(req, QJsonDocument(body).toJson());
-  QEventLoop loop;
-  connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-  loop.exec();
-  if (reply->error() != QNetworkReply::NoError) {
-    QString msg;
-    if (reply->error() == QNetworkReply::ContentNotFoundError)
-      msg = "model not found";
-    else if (reply->error() == QNetworkReply::TooManyRedirectsError
-             || reply->error() == QNetworkReply::ContentOperationNotPermittedError)
-      msg = "429 rate limit";
-    else {
-      QByteArray bodyData = reply->readAll();
-      QJsonDocument d = QJsonDocument::fromJson(bodyData);
-      msg = d["error"]["message"].toString(bodyData);
-    }
-    if (error) *error = msg;
-    reply->deleteLater();
+  QList<QPair<QByteArray,QByteArray>> headers;
+  headers.append({"x-goog-api-key", key.toUtf8()});
+  QByteArray reply;
+  QString err;
+  postJsonSync(QUrl(url), QJsonDocument(body).toJson(), headers, &reply, &err, 60000);
+  if (!err.isEmpty()) {
+    if (error) *error = err;
     return {};
   }
-  QByteArray data = reply->readAll();
-  reply->deleteLater();
-  QJsonDocument doc = QJsonDocument::fromJson(data);
+  QJsonDocument doc = QJsonDocument::fromJson(reply);
   QJsonObject root = doc.object();
+
+  // Check for error in JSON body (Gemini may return HTTP 200 with error object)
+  if (root.contains("error")) {
+    QJsonObject e = root["error"].toObject();
+    if (error) *error = e["message"].toString(root["error"].toString());
+    return {};
+  }
+
   QString text;
-  const QJsonArray candidates = root["candidates"].toArray();
+  QJsonArray candidates = root["candidates"].toArray();
   for (int i = 0; i < candidates.size(); ++i) {
-    const QJsonObject c = candidates[i].toObject();
-    const QJsonArray parts = c["content"]["parts"].toArray();
+    QJsonObject c = candidates[i].toObject();
+    QJsonArray parts = c["content"].toObject()["parts"].toArray();
     for (int j = 0; j < parts.size(); ++j) {
       text += parts[j].toObject()["text"].toString();
     }
+    QString finish = c["finishReason"].toString();
+    if (finish == "SAFETY") {
+      if (error) *error = "Content blocked by safety filter";
+      return {};
+    }
+  }
+
+  if (text.trimmed().isEmpty()) {
+    if (error) *error = "Empty response from model";
+    return {};
   }
   return text.trimmed();
 }
@@ -95,10 +92,10 @@ QString GeminiDescribeEngine::describe(const QString &imagePath, QString *error)
 
   QJsonObject textPart;
   textPart["text"] = prompt.join("\n");
-  QJsonObject imgPart;
   QJsonObject inlineData;
   inlineData["mime_type"] = "image/jpeg";
   inlineData["data"] = QString::fromLatin1(imgB64);
+  QJsonObject imgPart;
   imgPart["inline_data"] = inlineData;
   QJsonArray parts;
   parts.append(textPart);
@@ -133,13 +130,14 @@ QString GeminiDescribeEngine::describe(const QString &imagePath, QString *error)
       QString result = postGemini(model, m_keys[ki], body, &err);
       if (!result.isEmpty()) return result;
 
-      if (err.contains("429") || err.contains("rate limit")
-          || err.contains("quota") || err.contains("exhausted")
-          || err.contains("RESOURCE_EXHAUSTED")) {
+      const QString errLow = err.toLower();
+      if (errLow.contains("429") || errLow.contains("rate limit")
+          || errLow.contains("quota") || errLow.contains("exhausted")
+          || errLow.contains("resource_exhausted")) {
         m_deadKeys.insert(ki);
         continue;
       }
-      if (err.contains("model not found") || err.contains("NOT_FOUND"))
+      if (errLow.contains("model not found") || errLow.contains("not_found"))
         break;
     }
   }
